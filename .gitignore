@@ -1,0 +1,10 @@
+# User config (API key lives here) — never committed
+config/
+
+# User data: word lists, history, response cache — never committed
+data/
+
+node_modules/
+npm-debug.log*
+*.log
+.DS_Store

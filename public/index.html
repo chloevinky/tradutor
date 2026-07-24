@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tradutor — pt-BR ↔ EN</title>
+<link rel="stylesheet" href="style.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🇧🇷</text></svg>">
+</head>
+<body>
+
+<header class="topbar">
+  <h1>Tradutor <span class="sub">pt-BR ↔ EN</span></h1>
+  <div class="toggles">
+    <label class="toggle" title="Blur PT→EN output until you click to reveal — forces a comprehension attempt first">
+      <input type="checkbox" id="toggle-blur" checked> blur reveal
+    </label>
+    <label class="toggle" title="Leave your known Portuguese words untranslated inside the English output">
+      <input type="checkbox" id="toggle-progressive"> progressive
+    </label>
+    <label class="toggle" title="Critique mode: you wrote the Portuguese yourself — get corrections instead of a translation">
+      <input type="checkbox" id="toggle-critique"> critique
+    </label>
+  </div>
+  <div class="topbar-actions">
+    <button id="btn-review" class="btn">Review</button>
+    <button id="btn-settings" class="btn">Settings</button>
+  </div>
+</header>
+
+<div id="error-bar" class="error-bar hidden">
+  <span id="error-text"></span>
+  <button id="btn-retry" class="btn btn-small">Retry</button>
+  <button id="btn-error-close" class="btn btn-small">✕</button>
+</div>
+
+<main class="panes">
+  <section class="pane pane-input">
+    <div class="pane-head">
+      <span id="input-label">Input <span class="dim">(auto-detect)</span></span>
+      <span class="hint">pause to translate · Ctrl+Enter now</span>
+    </div>
+    <div class="input-wrap">
+      <textarea id="input" spellcheck="false" autofocus
+        placeholder="Cola aqui… paste Portuguese or English. Chat register welcome: vc, pq, tbm, kkkk…"></textarea>
+      <div id="input-annotated" class="annotated-overlay hidden"></div>
+    </div>
+    <div id="input-warnings" class="warn-strip"></div>
+  </section>
+
+  <section class="pane pane-output">
+    <div class="pane-head">
+      <span id="output-label">Translation</span>
+      <span id="output-status" class="dim"></span>
+    </div>
+    <div class="output-wrap">
+      <div id="output" class="output-body"></div>
+      <button id="reveal-overlay" class="reveal-overlay hidden">
+        <span>tap to reveal</span>
+        <small>try to understand the Portuguese first</small>
+      </button>
+    </div>
+    <div id="expansions" class="chip-strip"></div>
+    <div id="structures" class="chip-strip"></div>
+    <div id="variants" class="variants hidden"></div>
+    <div id="output-warnings" class="warn-strip"></div>
+  </section>
+</main>
+
+<!-- word detail side panel -->
+<aside id="word-panel" class="side-panel hidden">
+  <div class="side-head">
+    <h2 id="wp-surface"></h2>
+    <button id="wp-close" class="btn btn-small">✕</button>
+  </div>
+  <div class="side-body">
+    <div id="wp-gloss" class="wp-gloss"></div>
+    <div id="wp-meta" class="wp-meta"></div>
+    <div id="wp-note" class="wp-note"></div>
+    <div id="wp-conjugation"></div>
+    <div id="wp-collocations"></div>
+    <label class="known-toggle">
+      <input type="checkbox" id="wp-known"> I know this word
+    </label>
+  </div>
+</aside>
+
+<!-- review drawer -->
+<aside id="review-panel" class="side-panel wide hidden">
+  <div class="side-head">
+    <h2>Review</h2>
+    <div>
+      <a id="btn-anki" class="btn btn-small" href="/api/export/anki" download>Export Anki TSV</a>
+      <button id="review-close" class="btn btn-small">✕</button>
+    </div>
+  </div>
+  <div class="side-body">
+    <h3>Most looked-up words</h3>
+    <div id="review-words" class="review-words"></div>
+    <h3>Sentences you needed revealed</h3>
+    <div id="review-sentences" class="review-sentences"></div>
+  </div>
+</aside>
+
+<!-- settings modal -->
+<div id="settings-modal" class="modal hidden">
+  <div class="modal-card">
+    <h2>Settings</h2>
+    <p class="dim">Stored locally in <code>config/settings.json</code> (gitignored). The key never leaves this machine except to call the Anthropic API.</p>
+    <label class="field">
+      <span>Anthropic API key</span>
+      <input type="password" id="set-key" placeholder="sk-ant-…" autocomplete="off">
+      <small id="set-key-hint" class="dim"></small>
+    </label>
+    <label class="field">
+      <span>Model</span>
+      <input type="text" id="set-model" placeholder="claude-opus-4-8">
+    </label>
+    <div id="set-msg" class="set-msg"></div>
+    <div class="modal-actions">
+      <button id="set-cancel" class="btn">Close</button>
+      <button id="set-save" class="btn btn-primary">Save</button>
+    </div>
+  </div>
+</div>
+
+<div id="tooltip" class="tooltip hidden"></div>
+
+<script src="abbrev.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
