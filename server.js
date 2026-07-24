@@ -15,7 +15,8 @@ app.use(express.static(path.join(store.ROOT, 'public')));
 const PROMPTS_DIR = path.join(store.ROOT, 'prompts');
 
 function loadPrompt(mode) {
-  const file = path.join(PROMPTS_DIR, mode === 'critique' ? 'critique.md' : 'translate.md');
+  const names = { critique: 'critique.md', ask: 'ask.md' };
+  const file = path.join(PROMPTS_DIR, names[mode] || 'translate.md');
   const text = fs.readFileSync(file, 'utf8');
   const hash = crypto.createHash('sha256').update(text).digest('hex').slice(0, 16);
   return { text, hash };
@@ -185,6 +186,56 @@ app.post('/api/translate', async (req, res) => {
     }
     cachePut(key, { result, raw });
     finish(result, raw, false);
+  } catch (err) {
+    const fe = friendlyError(err);
+    send({ type: 'error', message: fe.message, code: fe.code, status: fe.status });
+    res.end();
+  }
+});
+
+// ---------- ask (follow-up questions about the current text, NDJSON stream) ----------
+
+app.post('/api/ask', async (req, res) => {
+  const settings = store.getSettings();
+  const { question, text = '', translation = '' } = req.body || {};
+  const q = String(question || '').trim();
+
+  if (!settings.apiKey) {
+    return res.status(400).json({ error: 'No API key configured. Open Settings first.', code: 'no_key' });
+  }
+  if (!q) {
+    return res.status(400).json({ error: 'No question given.', code: 'empty' });
+  }
+
+  res.setHeader('Content-Type', 'application/x-ndjson; charset=utf-8');
+  res.setHeader('Cache-Control', 'no-cache');
+  const send = (obj) => res.write(JSON.stringify(obj) + '\n');
+
+  let prompt;
+  try {
+    prompt = loadPrompt('ask');
+  } catch (err) {
+    send({ type: 'error', message: 'Prompt file missing: ' + err.message });
+    return res.end();
+  }
+
+  const userContent = [
+    `Text the learner is looking at:\n<<<\n${String(text).trim() || '(empty)'}\n>>>`,
+    `Its translation:\n<<<\n${String(translation).trim() || '(none yet)'}\n>>>`,
+    `Question: ${q}`,
+  ].join('\n\n');
+
+  try {
+    const raw = await streamCompletion({
+      apiKey: settings.apiKey,
+      model: settings.model,
+      system: prompt.text,
+      userContent,
+      maxTokens: 4000,
+      onDelta: (delta) => send({ type: 'delta', text: delta }),
+    });
+    send({ type: 'done', answer: raw.trim() });
+    res.end();
   } catch (err) {
     const fe = friendlyError(err);
     send({ type: 'error', message: fe.message, code: fe.code, status: fe.status });

@@ -1,21 +1,28 @@
-/* Tradutor frontend — vanilla JS, no build step. */
+/* Tradutor frontend — vanilla JS, no build step.
+   Both panes are editable: type in either side and the translation renders
+   in the other (direction is auto-detected by the model). */
 (() => {
   'use strict';
 
   const $ = (id) => document.getElementById(id);
 
+  const sides = {};
+  for (const side of ['left', 'right']) {
+    sides[side] = {
+      side,
+      textarea: $('text-' + side),
+      render: $('render-' + side),
+      reveal: $('reveal-' + side),
+      label: $('label-' + side),
+      status: $('status-' + side),
+      chips: $('chips-' + side),
+      variants: $('variants-' + side),
+      warn: $('warn-' + side),
+    };
+  }
+  const other = (side) => (side === 'left' ? 'right' : 'left');
+
   const els = {
-    input: $('input'),
-    inputAnnotated: $('input-annotated'),
-    inputWarnings: $('input-warnings'),
-    output: $('output'),
-    outputLabel: $('output-label'),
-    outputStatus: $('output-status'),
-    revealOverlay: $('reveal-overlay'),
-    expansions: $('expansions'),
-    structures: $('structures'),
-    variants: $('variants'),
-    outputWarnings: $('output-warnings'),
     errorBar: $('error-bar'),
     errorText: $('error-text'),
     tooltip: $('tooltip'),
@@ -25,16 +32,27 @@
     toggleBlur: $('toggle-blur'),
     toggleProgressive: $('toggle-progressive'),
     toggleCritique: $('toggle-critique'),
+    askInput: $('ask-input'),
+    askBtn: $('ask-btn'),
+    askAnswer: $('ask-answer'),
+  };
+
+  const DEFAULT_LABELS = {
+    left: 'Português / English <span class="dim">(auto)</span>',
+    right: 'Translation <span class="dim">(or type here to reverse)</span>',
   };
 
   const state = {
     known: new Set(),
+    source: 'left',       // which pane the current text was typed into
     result: null,
     historyId: null,
-    pendingReveal: null, // {historyId} while a blurred pt-en result awaits reveal
-    annMap: new Map(),   // normalized word -> annotation object
+    pendingReveal: null,  // {historyId} while a blurred pt-en result awaits reveal
+    annMap: new Map(),    // normalized word -> annotation object
     abort: null,
-    lastSentText: '',
+    askAbort: null,
+    lastKey: '',          // dedupe key of the last request sent
+    lastText: '',         // source text of the last request sent
     panelWord: null,
   };
 
@@ -64,14 +82,29 @@
     .replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, '');
 
   function api(path, opts) {
-    return fetch(path, {
-      headers: { 'Content-Type': 'application/json' },
-      ...opts,
-    });
+    return fetch(path, { headers: { 'Content-Type': 'application/json' }, ...opts });
   }
-
   function post(path, body) {
     return api(path, { method: 'POST', body: JSON.stringify(body) });
+  }
+
+  // Read an NDJSON response, invoking onMsg per parsed line.
+  async function readNdjson(res, onMsg) {
+    const reader = res.body.getReader();
+    const dec = new TextDecoder();
+    let buf = '';
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += dec.decode(value, { stream: true });
+      let idx;
+      while ((idx = buf.indexOf('\n')) >= 0) {
+        const line = buf.slice(0, idx).trim();
+        buf = buf.slice(idx + 1);
+        if (!line) continue;
+        try { onMsg(JSON.parse(line)); } catch { /* skip malformed line */ }
+      }
+    }
   }
 
   // ---------- error bar ----------
@@ -166,108 +199,113 @@
     return html;
   }
 
-  // ---------- output rendering ----------
+  // ---------- rendering ----------
 
-  function clearOutputExtras() {
-    els.expansions.innerHTML = '';
-    els.structures.innerHTML = '';
-    els.variants.innerHTML = '';
-    els.variants.classList.add('hidden');
-    els.outputWarnings.innerHTML = '';
-    els.inputWarnings.innerHTML = '';
+  function clearExtras() {
+    for (const side of ['left', 'right']) {
+      sides[side].chips.innerHTML = '';
+      sides[side].warn.innerHTML = '';
+      sides[side].variants.innerHTML = '';
+      sides[side].variants.classList.add('hidden');
+    }
   }
 
-  function setBlur(on) {
-    els.output.classList.toggle('blurred', on);
-    els.revealOverlay.classList.toggle('hidden', !on);
+  function setBlur(side, on) {
+    for (const s of ['left', 'right']) {
+      const P = sides[s];
+      const active = on && s === side;
+      P.render.classList.toggle('blurred', active);
+      P.reveal.classList.toggle('hidden', !active);
+    }
   }
 
   function renderResult() {
     const r = state.result;
     if (!r) return;
-    clearOutputExtras();
+    clearExtras();
 
     if (r.mode === 'critique') {
       renderCritique(r);
       return;
     }
 
+    const src = state.source;
+    const tgt = other(src);
+    const S = sides[src];
+    const T = sides[tgt];
     const dir = r.direction;
-    els.outputLabel.textContent = dir === 'pt-en' ? 'English' : dir === 'en-pt' ? 'Português' : 'Translation';
     state.annMap = buildAnnMap(r.words);
+    const ptSide = dir === 'pt-en' ? src : dir === 'en-pt' ? tgt : null;
 
-    // Output pane: annotate PT when output is Portuguese; highlight ambiguity in EN.
-    if (dir === 'en-pt') {
-      els.output.innerHTML = renderAnnotatedText(r.translation || '');
+    S.label.textContent = dir === 'pt-en' ? 'Português' : dir === 'en-pt' ? 'English' : 'Input';
+    T.label.textContent = dir === 'pt-en' ? 'English' : dir === 'en-pt' ? 'Português' : 'Translation';
+
+    // Target pane: translation in the textarea (copyable/editable), rendered view on top.
+    T.textarea.value = r.translation || '';
+    T.render.innerHTML = ptSide === tgt
+      ? renderAnnotatedText(r.translation || '')
+      : renderTranslationHtml(r.translation || '', r.ambiguities);
+    T.render.classList.remove('hidden');
+
+    // Source pane: annotated overlay when the source is Portuguese.
+    if (ptSide === src) {
+      S.render.innerHTML = renderAnnotatedText(S.textarea.value);
+      S.render.classList.toggle('hidden', document.activeElement === S.textarea);
     } else {
-      els.output.innerHTML = renderTranslationHtml(r.translation || '', r.ambiguities);
+      S.render.classList.add('hidden');
     }
 
-    // Input pane: annotated overlay when the input is Portuguese.
-    if (dir === 'pt-en') {
-      els.inputAnnotated.innerHTML = renderAnnotatedText(els.input.value);
-      if (document.activeElement !== els.input) {
-        els.inputAnnotated.classList.remove('hidden');
-      }
-    } else {
-      els.inputAnnotated.classList.add('hidden');
-    }
-
-    // Expansions: vc → você chips.
+    // Learning extras attach to the Portuguese pane.
+    const P = ptSide ? sides[ptSide] : T;
     for (const e of r.expansions || []) {
       const chip = document.createElement('span');
       chip.className = 'chip';
       chip.textContent = `${e.from} → ${e.to}${e.meaning ? ` (${e.meaning})` : ''}`;
-      els.expansions.appendChild(chip);
+      P.chips.appendChild(chip);
     }
-
-    // Structure notes.
     for (const s of r.structures || []) {
       const chip = document.createElement('span');
       chip.className = 'chip struct';
       chip.textContent = `${s.text} — ${s.note}`;
-      els.structures.appendChild(chip);
+      P.chips.appendChild(chip);
     }
-
-    // False friends.
     for (const f of r.false_friends || []) {
       const card = document.createElement('div');
       card.className = 'warn-card';
       card.innerHTML = `⚠️ <b>${esc(f.word)}</b> looks like “${esc(f.looks_like)}” but means: ${esc(f.actually_means)}`;
-      (dir === 'pt-en' ? els.inputWarnings : els.outputWarnings).appendChild(card);
+      P.warn.appendChild(card);
     }
-
-    // Register variants (en→pt).
     if (r.register_variants && (r.register_variants.casual || r.register_variants.neutral)) {
-      els.variants.classList.remove('hidden');
+      P.variants.classList.remove('hidden');
       for (const [tag, textv] of Object.entries(r.register_variants)) {
         if (!textv) continue;
         const div = document.createElement('div');
         div.className = 'variant';
         div.innerHTML = `<span class="tag">${esc(tag)}</span>${renderAnnotatedText(textv)}`;
-        els.variants.appendChild(div);
+        P.variants.appendChild(div);
       }
     }
-
     if (r.parse_failed) {
       const card = document.createElement('div');
       card.className = 'warn-card';
       card.textContent = 'The model returned unstructured output this time — showing raw text without annotations.';
-      els.outputWarnings.appendChild(card);
+      T.warn.appendChild(card);
     }
 
-    // Blur mechanic: pt→en only.
+    // Blur mechanic: English output of pt→en only.
     const shouldBlur = dir === 'pt-en' && prefs.blur;
-    setBlur(shouldBlur);
+    setBlur(tgt, shouldBlur);
     if (shouldBlur && state.historyId) {
       state.pendingReveal = { historyId: state.historyId };
     }
   }
 
   function renderCritique(r) {
-    els.outputLabel.textContent = 'Critique';
+    const T = sides[other(state.source)];
+    T.label.textContent = 'Critique';
     state.annMap = buildAnnMap(r.words);
-    setBlur(false);
+    setBlur(null, false);
+    T.textarea.value = '';
 
     const ok = r.grammatical === true && (!r.issues || r.issues.length === 0);
     let html = '<div class="critique">';
@@ -286,8 +324,8 @@
       `<div class="natural-line">${renderAnnotatedText(r.natural || '')}</div>` +
       (r.why_natural ? `<div class="dim">${esc(r.why_natural)}</div>` : '') + '</div>';
     html += '</div>';
-    els.output.innerHTML = html;
-    els.inputAnnotated.classList.add('hidden');
+    T.render.innerHTML = html;
+    T.render.classList.remove('hidden');
   }
 
   // ---------- streaming translate ----------
@@ -315,12 +353,17 @@
   }
 
   async function translate(force) {
-    const text = els.input.value.trim();
+    const src = state.source;
+    const S = sides[src];
+    const T = sides[other(src)];
+    const text = S.textarea.value.trim();
     if (!text) return;
-    if (!force && text === state.lastSentText) return;
 
-    // Previous blurred result never revealed -> that's a "needed review" signal? No:
-    // dismissed-unrevealed means the learner understood it. Log as dismiss.
+    const mode = prefs.critique ? 'critique' : 'translate';
+    const dedupeKey = [src, mode, prefs.progressive ? 'p' : '', text].join('|');
+    if (!force && dedupeKey === state.lastKey) return;
+
+    // A blurred result the learner never revealed counts as understood — log dismiss.
     if (state.pendingReveal) {
       post('/api/log', { event: 'dismiss', historyId: state.pendingReveal.historyId });
       state.pendingReveal = null;
@@ -329,18 +372,21 @@
     if (state.abort) state.abort.abort();
     const abort = new AbortController();
     state.abort = abort;
-    state.lastSentText = text;
+    state.lastKey = dedupeKey;
+    state.lastText = text;
     state.result = null;
     state.historyId = null;
     state.annMap = new Map();
     hideError();
-    clearOutputExtras();
-    els.inputAnnotated.classList.add('hidden');
-    els.output.textContent = '';
-    els.outputStatus.textContent = '…';
-    setBlur(false);
+    clearExtras();
+    setBlur(null, false);
+    S.render.classList.add('hidden');
+    T.textarea.value = '';
+    T.render.textContent = '';
+    T.render.classList.remove('hidden');
+    T.status.textContent = '…';
+    S.status.textContent = '';
 
-    const mode = prefs.critique ? 'critique' : 'translate';
     let raw = '';
     let blurArmed = false;
 
@@ -353,95 +399,179 @@
 
       if (!res.ok) {
         const e = await res.json().catch(() => ({}));
-        if (e.code === 'no_key') {
-          openSettings();
-        }
+        if (e.code === 'no_key') openSettings();
         showError(e.error || `Request failed (${res.status})`);
-        els.outputStatus.textContent = '';
+        T.status.textContent = '';
         return;
       }
 
-      const reader = res.body.getReader();
-      const dec = new TextDecoder();
-      let buf = '';
-
-      const handleLine = (line) => {
-        let msg;
-        try { msg = JSON.parse(line); } catch { return; }
+      await readNdjson(res, (msg) => {
         if (msg.type === 'delta') {
           raw += msg.text;
-          const dir = partialDirection(raw);
-          if (dir === 'pt-en' && prefs.blur && mode === 'translate' && !blurArmed) {
+          if (!blurArmed && mode === 'translate' && prefs.blur && partialDirection(raw) === 'pt-en') {
             blurArmed = true;
-            setBlur(true);
+            setBlur(other(src), true);
           }
           const partial = partialTranslation(raw);
-          if (partial !== null) {
-            els.output.textContent = partial;
-            els.outputScroll?.();
-          }
+          if (partial !== null) T.render.textContent = partial;
         } else if (msg.type === 'done') {
           state.result = msg.result;
           state.historyId = msg.historyId;
-          els.outputStatus.textContent = msg.cached ? 'cached' : '';
+          T.status.textContent = msg.cached ? 'cached' : '';
           renderResult();
         } else if (msg.type === 'error') {
           showError(msg.message);
-          els.outputStatus.textContent = '';
+          T.status.textContent = '';
         }
-      };
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buf += dec.decode(value, { stream: true });
-        let idx;
-        while ((idx = buf.indexOf('\n')) >= 0) {
-          const line = buf.slice(0, idx).trim();
-          buf = buf.slice(idx + 1);
-          if (line) handleLine(line);
-        }
-      }
-      if (els.outputStatus.textContent === '…') els.outputStatus.textContent = '';
+      });
+      if (T.status.textContent === '…') T.status.textContent = '';
     } catch (err) {
       if (err.name === 'AbortError') return;
       showError('Connection to the local server failed: ' + err.message);
-      els.outputStatus.textContent = '';
+      T.status.textContent = '';
     }
   }
 
-  els.input.addEventListener('input', () => {
-    els.inputAnnotated.classList.add('hidden');
-    scheduleTranslate();
-  });
-  els.input.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
-      e.preventDefault();
-      clearTimeout(debounceTimer);
-      translate(true);
-    }
-  });
-  els.input.addEventListener('blur', () => {
-    // Show annotated overlay when we have a fresh PT analysis of the current text.
-    if (state.result && state.result.direction === 'pt-en' &&
-        state.lastSentText === els.input.value.trim() && els.input.value.trim()) {
-      els.inputAnnotated.innerHTML = renderAnnotatedText(els.input.value);
-      els.inputAnnotated.classList.remove('hidden');
-    }
-  });
-  els.inputAnnotated.addEventListener('click', (e) => {
-    if (e.target.closest('.w')) return; // word clicks handled globally
-    els.inputAnnotated.classList.add('hidden');
-    els.input.focus();
-  });
+  // ---------- pane events (both sides are inputs) ----------
 
-  // ---------- reveal ----------
+  for (const side of ['left', 'right']) {
+    const S = sides[side];
 
-  els.revealOverlay.addEventListener('click', () => {
-    setBlur(false);
+    S.textarea.addEventListener('input', () => {
+      state.source = side;         // typing here makes this side the source
+      S.render.classList.add('hidden');
+      scheduleTranslate();
+    });
+
+    S.textarea.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+        e.preventDefault();
+        state.source = side;
+        clearTimeout(debounceTimer);
+        translate(true);
+      }
+    });
+
+    // Re-show the rendered overlay when focus leaves an unchanged pane.
+    S.textarea.addEventListener('blur', () => {
+      const r = state.result;
+      if (!r) return;
+      if (side === state.source) {
+        if (r.mode !== 'critique' && r.direction === 'pt-en' &&
+            S.textarea.value.trim() === state.lastText) {
+          S.render.innerHTML = renderAnnotatedText(S.textarea.value);
+          S.render.classList.remove('hidden');
+        }
+      } else if (S.textarea.value === (r.translation || '')) {
+        S.render.classList.remove('hidden');
+      }
+    });
+
+    // Clicking the rendered view (not on a word) drops into the textarea to edit.
+    S.render.addEventListener('click', (e) => {
+      if (e.target.closest('.w') || e.target.closest('.amb')) return;
+      S.render.classList.add('hidden');
+      S.textarea.focus();
+    });
+
+    S.reveal.addEventListener('click', () => {
+      setBlur(null, false);
+      if (state.pendingReveal) {
+        post('/api/log', { event: 'reveal', historyId: state.pendingReveal.historyId });
+        state.pendingReveal = null;
+      }
+    });
+  }
+
+  // ---------- clear ----------
+
+  function clearAll() {
     if (state.pendingReveal) {
-      post('/api/log', { event: 'reveal', historyId: state.pendingReveal.historyId });
+      post('/api/log', { event: 'dismiss', historyId: state.pendingReveal.historyId });
       state.pendingReveal = null;
+    }
+    if (state.abort) state.abort.abort();
+    if (state.askAbort) state.askAbort.abort();
+    clearTimeout(debounceTimer);
+    state.result = null;
+    state.historyId = null;
+    state.annMap = new Map();
+    state.lastKey = '';
+    state.lastText = '';
+    for (const side of ['left', 'right']) {
+      const S = sides[side];
+      S.textarea.value = '';
+      S.render.innerHTML = '';
+      S.render.classList.add('hidden');
+      S.status.textContent = '';
+      S.label.innerHTML = DEFAULT_LABELS[side];
+    }
+    setBlur(null, false);
+    clearExtras();
+    els.askInput.value = '';
+    els.askAnswer.textContent = '';
+    els.askAnswer.classList.add('hidden');
+    hideError();
+    state.source = 'left';
+    sides.left.textarea.focus();
+  }
+  $('btn-clear').addEventListener('click', clearAll);
+
+  // ---------- ask box ----------
+
+  async function ask() {
+    const question = els.askInput.value.trim();
+    if (!question) return;
+    const text = sides[state.source].textarea.value.trim();
+
+    if (state.askAbort) state.askAbort.abort();
+    const abort = new AbortController();
+    state.askAbort = abort;
+
+    els.askAnswer.classList.remove('hidden');
+    els.askAnswer.textContent = '…';
+    let answer = '';
+
+    try {
+      const res = await api('/api/ask', {
+        method: 'POST',
+        body: JSON.stringify({
+          question,
+          text,
+          translation: state.result?.translation || '',
+        }),
+        signal: abort.signal,
+      });
+
+      if (!res.ok) {
+        const e = await res.json().catch(() => ({}));
+        if (e.code === 'no_key') openSettings();
+        els.askAnswer.classList.add('hidden');
+        showError(e.error || `Request failed (${res.status})`);
+        return;
+      }
+
+      await readNdjson(res, (msg) => {
+        if (msg.type === 'delta') {
+          answer += msg.text;
+          els.askAnswer.textContent = answer;
+        } else if (msg.type === 'error') {
+          els.askAnswer.classList.add('hidden');
+          showError(msg.message);
+        }
+      });
+    } catch (err) {
+      if (err.name === 'AbortError') return;
+      els.askAnswer.classList.add('hidden');
+      showError('Connection to the local server failed: ' + err.message);
+    }
+  }
+
+  els.askBtn.addEventListener('click', ask);
+  els.askInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      ask();
     }
   });
 
@@ -501,6 +631,7 @@
 
     const lemmaKey = normWord(ann?.lemma) || key;
     $('wp-known').checked = state.known.has(key) || state.known.has(lemmaKey);
+    $('wp-known').parentElement.classList.remove('hidden');
 
     els.wordPanel.classList.remove('hidden');
 
@@ -515,13 +646,11 @@
     if (!pw) return;
     const lemmaKey = normWord(pw.ann?.lemma) || pw.key;
     const known = e.target.checked;
-    const res = await post('/api/known-words', { word: lemmaKey, known });
-    const data = await res.json();
-    state.known = new Set(data.words);
+    let res = await post('/api/known-words', { word: lemmaKey, known });
+    state.known = new Set((await res.json()).words);
     if (lemmaKey !== pw.key) {
-      await post('/api/known-words', { word: pw.key, known }).then(async (r) => {
-        state.known = new Set((await r.json()).words);
-      });
+      res = await post('/api/known-words', { word: pw.key, known });
+      state.known = new Set((await res.json()).words);
     }
     rerenderAnnotations();
   });
@@ -529,9 +658,9 @@
   function rerenderAnnotations() {
     if (!state.result) return;
     if (state.result.mode === 'critique') { renderCritique(state.result); return; }
-    const wasBlurred = els.output.classList.contains('blurred');
+    const blurredSide = ['left', 'right'].find((s) => sides[s].render.classList.contains('blurred'));
     renderResult();
-    if (!wasBlurred) setBlur(false);
+    if (!blurredSide) setBlur(null, false);
   }
 
   // Word + ambiguity clicks (event delegation covers all panes).
@@ -566,20 +695,20 @@
   els.toggleBlur.addEventListener('change', (e) => {
     prefs.blur = e.target.checked;
     if (!e.target.checked) {
-      setBlur(false);
+      setBlur(null, false);
       state.pendingReveal = null;
-    } else if (state.result?.direction === 'pt-en') {
-      setBlur(true);
+    } else if (state.result?.direction === 'pt-en' && state.result.mode !== 'critique') {
+      setBlur(other(state.source), true);
     }
   });
   els.toggleProgressive.addEventListener('change', (e) => {
     prefs.progressive = e.target.checked;
-    state.lastSentText = '';
+    state.lastKey = '';
     scheduleTranslate();
   });
   els.toggleCritique.addEventListener('change', (e) => {
     prefs.critique = e.target.checked;
-    state.lastSentText = '';
+    state.lastKey = '';
     clearTimeout(debounceTimer);
     translate(true);
   });

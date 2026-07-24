@@ -35,6 +35,13 @@ into a single two-pane page you keep bookmarked at **http://localhost:4747**.
   locally. The **Review** panel shows your most-looked-up unknown words and the
   sentences you needed revealed, and exports an **Anki-importable TSV** (front: PT
   sentence with the target word bolded; back: gloss + translation).
+- **Type in either pane** — the panes are bidirectional. Type Portuguese (or anything)
+  on the left and the translation renders on the right; type English on the right and
+  the Portuguese appears on the left. Direction is always auto-detected.
+- **Ask box** — a follow-up question bar under the panes: ask things like *"why is this
+  word used here?"* or *"could I say X instead?"* and the model answers about the
+  current text/translation (prompt in `prompts/ask.md`).
+- **Clear button** — resets both panes, annotations and the ask answer in one click.
 - Register variants (casual + neutral) for EN→PT, chat-log-aware translation
   (message structure preserved), light/dark theme following the system.
 
@@ -55,9 +62,14 @@ API key (get one at https://console.anthropic.com). The key is validated and sav
 
 ### Usage
 
-- Paste or type in the left pane. Translation starts automatically when you pause
-  typing; **Ctrl+Enter** translates immediately.
-- Direction (pt→en / en→pt) is auto-detected.
+- Paste or type in **either pane** — the translation renders in the other one.
+  Translation starts automatically when you pause typing; **Ctrl+Enter** translates
+  immediately.
+- Direction (pt→en / en→pt) is auto-detected; typing English in the right pane is the
+  quickest way to go EN→PT-BR.
+- Click a rendered translation to edit it (it's a real text box underneath).
+- Use the **Ask** bar below the panes for follow-up questions about the current text.
+- **Clear** (top right) empties both panes.
 - Repeated translations are served instantly from the local cache (no API cost).
 
 ## Start on Windows boot (zero-friction)
@@ -101,6 +113,7 @@ The system prompts are plain files — edit them without touching code:
 
 - `prompts/translate.md` — translation + annotation behavior (JSON schema lives here).
 - `prompts/critique.md` — critique-mode behavior.
+- `prompts/ask.md` — how follow-up questions in the Ask bar are answered.
 
 Prompt edits automatically invalidate the response cache (the cache key includes a
 hash of the prompt).

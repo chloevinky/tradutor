@@ -85,12 +85,18 @@ body {
 .error-bar span { flex: 1; }
 
 /* ---------- panes ---------- */
+.workspace {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
 .panes {
   flex: 1;
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 14px;
-  padding: 14px 18px 18px;
+  padding: 14px 18px 10px;
   min-height: 0;
 }
 @media (max-width: 800px) { .panes { grid-template-columns: 1fr; } }
@@ -114,15 +120,15 @@ body {
 .hint { font-weight: 400; text-transform: none; letter-spacing: 0; }
 .dim { color: var(--dim); font-weight: 400; }
 
-.input-wrap { position: relative; flex: 1; min-height: 220px; display: flex; }
-textarea#input {
+.pane-body { position: relative; flex: 1; min-height: 220px; display: flex; }
+.pane-text {
   flex: 1; width: 100%;
   border: 0; outline: none; resize: none;
   background: transparent; color: var(--text);
   font: inherit; font-size: 17px; line-height: 1.65;
   padding: 8px 14px 14px;
 }
-.annotated-overlay {
+.pane-render {
   position: absolute; inset: 0;
   overflow-y: auto;
   background: var(--panel);
@@ -131,17 +137,9 @@ textarea#input {
   white-space: pre-wrap;
   word-wrap: break-word;
   cursor: text;
-}
-
-.output-wrap { position: relative; flex: 1; min-height: 220px; overflow-y: auto; }
-.output-body {
-  padding: 8px 14px 14px;
-  font-size: 17px; line-height: 1.65;
-  white-space: pre-wrap;
-  word-wrap: break-word;
   transition: filter 0.25s;
 }
-.output-body.blurred { filter: blur(7px); user-select: none; }
+.pane-render.blurred { filter: blur(7px); user-select: none; }
 .reveal-overlay {
   position: absolute; inset: 0;
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
@@ -207,6 +205,33 @@ textarea#input {
 .critique .issue .note { color: var(--dim); font-size: 13px; display: block; margin-top: 2px; }
 .critique .block-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--dim); font-weight: 700; margin-bottom: 2px; }
 .critique .natural-line { font-size: 17px; }
+
+/* ---------- ask bar ---------- */
+.askbar { display: flex; gap: 8px; padding: 0 18px 10px; }
+.askbar input {
+  flex: 1;
+  font: inherit; font-size: 14px;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--panel);
+  color: var(--text);
+  outline: none;
+}
+.askbar input:focus { border-color: var(--accent); }
+.ask-answer {
+  margin: 0 18px 16px;
+  padding: 10px 14px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  font-size: 14.5px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  max-height: 30vh;
+  overflow-y: auto;
+}
 
 /* ---------- tooltip ---------- */
 .tooltip {

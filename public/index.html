@@ -23,6 +23,7 @@
     </label>
   </div>
   <div class="topbar-actions">
+    <button id="btn-clear" class="btn" title="Clear both panes">Clear</button>
     <button id="btn-review" class="btn">Review</button>
     <button id="btn-settings" class="btn">Settings</button>
   </div>
@@ -34,37 +35,53 @@
   <button id="btn-error-close" class="btn btn-small">✕</button>
 </div>
 
-<main class="panes">
-  <section class="pane pane-input">
-    <div class="pane-head">
-      <span id="input-label">Input <span class="dim">(auto-detect)</span></span>
-      <span class="hint">pause to translate · Ctrl+Enter now</span>
-    </div>
-    <div class="input-wrap">
-      <textarea id="input" spellcheck="false" autofocus
-        placeholder="Cola aqui… paste Portuguese or English. Chat register welcome: vc, pq, tbm, kkkk…"></textarea>
-      <div id="input-annotated" class="annotated-overlay hidden"></div>
-    </div>
-    <div id="input-warnings" class="warn-strip"></div>
-  </section>
+<main class="workspace">
+  <div class="panes">
+    <section class="pane" data-side="left">
+      <div class="pane-head">
+        <span class="pane-label" id="label-left">Português / English <span class="dim">(auto)</span></span>
+        <span class="dim pane-status" id="status-left"></span>
+      </div>
+      <div class="pane-body">
+        <textarea id="text-left" class="pane-text" spellcheck="false" autofocus
+          placeholder="Cola aqui… Portuguese or English, chat register welcome (vc, pq, tbm, kkkk…). Pause to translate · Ctrl+Enter now"></textarea>
+        <div id="render-left" class="pane-render hidden"></div>
+        <button id="reveal-left" class="reveal-overlay hidden">
+          <span>tap to reveal</span>
+          <small>try to understand the Portuguese first</small>
+        </button>
+      </div>
+      <div id="chips-left" class="chip-strip"></div>
+      <div id="variants-left" class="variants hidden"></div>
+      <div id="warn-left" class="warn-strip"></div>
+    </section>
 
-  <section class="pane pane-output">
-    <div class="pane-head">
-      <span id="output-label">Translation</span>
-      <span id="output-status" class="dim"></span>
-    </div>
-    <div class="output-wrap">
-      <div id="output" class="output-body"></div>
-      <button id="reveal-overlay" class="reveal-overlay hidden">
-        <span>tap to reveal</span>
-        <small>try to understand the Portuguese first</small>
-      </button>
-    </div>
-    <div id="expansions" class="chip-strip"></div>
-    <div id="structures" class="chip-strip"></div>
-    <div id="variants" class="variants hidden"></div>
-    <div id="output-warnings" class="warn-strip"></div>
-  </section>
+    <section class="pane" data-side="right">
+      <div class="pane-head">
+        <span class="pane-label" id="label-right">Translation <span class="dim">(or type here to reverse)</span></span>
+        <span class="dim pane-status" id="status-right"></span>
+      </div>
+      <div class="pane-body">
+        <textarea id="text-right" class="pane-text" spellcheck="false"
+          placeholder="…or type English here — the Portuguese appears on the left"></textarea>
+        <div id="render-right" class="pane-render hidden"></div>
+        <button id="reveal-right" class="reveal-overlay hidden">
+          <span>tap to reveal</span>
+          <small>try to understand the Portuguese first</small>
+        </button>
+      </div>
+      <div id="chips-right" class="chip-strip"></div>
+      <div id="variants-right" class="variants hidden"></div>
+      <div id="warn-right" class="warn-strip"></div>
+    </section>
+  </div>
+
+  <div class="askbar">
+    <input id="ask-input" type="text" autocomplete="off"
+      placeholder="Ask about this translation — e.g. why is this word used here? (Enter to send)">
+    <button id="ask-btn" class="btn">Ask</button>
+  </div>
+  <div id="ask-answer" class="ask-answer hidden"></div>
 </main>
 
 <!-- word detail side panel -->
