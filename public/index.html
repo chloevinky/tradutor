@@ -9,90 +9,202 @@
 </head>
 <body>
 
-<header class="topbar">
-  <h1>Tradutor <span class="sub">pt-BR ↔ EN</span></h1>
-  <div class="toggles">
-    <label class="toggle" title="Blur PT→EN output until you click to reveal — forces a comprehension attempt first">
-      <input type="checkbox" id="toggle-blur" checked> blur reveal
-    </label>
-    <label class="toggle" title="Leave your known Portuguese words untranslated inside the English output">
-      <input type="checkbox" id="toggle-progressive"> progressive
-    </label>
-    <label class="toggle" title="Critique mode: you wrote the Portuguese yourself — get corrections instead of a translation">
-      <input type="checkbox" id="toggle-critique"> critique
-    </label>
-  </div>
-  <div class="topbar-actions">
-    <button id="btn-clear" class="btn" title="Clear both panes">Clear</button>
-    <button id="btn-review" class="btn">Review</button>
-    <button id="btn-settings" class="btn">Settings</button>
-  </div>
-</header>
+<div class="appwindow">
 
-<div id="error-bar" class="error-bar hidden">
-  <span id="error-text"></span>
-  <button id="btn-retry" class="btn btn-small">Retry</button>
-  <button id="btn-error-close" class="btn btn-small">✕</button>
-</div>
+  <!-- fake window titlebar -->
+  <div class="titlebar">
+    <span class="titlebar-icon">🇧🇷</span>
+    <span class="titlebar-text">Tradutor — Brazilian Portuguese ↔ English</span>
+    <span class="titlebar-btns">
+      <span class="tb-btn">▁</span><span class="tb-btn">□</span><span class="tb-btn tb-close">✕</span>
+    </span>
+  </div>
 
-<main class="workspace">
-  <div class="panes">
-    <section class="pane" data-side="left">
-      <div class="pane-head">
-        <span class="pane-label" id="label-left">Português / English <span class="dim">(auto)</span></span>
-        <span class="dim pane-status" id="status-left"></span>
+  <!-- menu bar -->
+  <div class="menubar" id="menubar">
+    <div class="menu" data-menu="file">
+      <span class="menu-title"><u>F</u>ile</span>
+      <div class="menu-drop">
+        <button class="mi" data-cmd="open-book">Open ebook…<span class="accel">Ctrl+O</span></button>
+        <button class="mi" data-cmd="export-tsv">Export Anki TSV file</button>
+        <button class="mi" data-cmd="anki-export">Sync to Anki (AnkiConnect)</button>
+        <div class="msep"></div>
+        <button class="mi" data-cmd="settings">Preferences…</button>
       </div>
-      <div class="pane-body">
-        <textarea id="text-left" class="pane-text" spellcheck="false" autofocus
-          placeholder="Cola aqui… Portuguese or English, chat register welcome (vc, pq, tbm, kkkk…). Pause to translate · Ctrl+Enter now"></textarea>
-        <div id="render-left" class="pane-render hidden"></div>
-        <button id="reveal-left" class="reveal-overlay hidden">
-          <span>tap to reveal</span>
-          <small>try to understand the Portuguese first</small>
-        </button>
+    </div>
+    <div class="menu" data-menu="edit">
+      <span class="menu-title"><u>E</u>dit</span>
+      <div class="menu-drop">
+        <button class="mi" data-cmd="translate">Translate<span class="accel">Ctrl+Enter</span></button>
+        <button class="mi" data-cmd="clear">Clear<span class="accel">Ctrl+L</span></button>
+        <div class="msep"></div>
+        <button class="mi" data-cmd="copy-translation">Copy translation</button>
       </div>
-      <div id="chips-left" class="chip-strip"></div>
-      <div id="variants-left" class="variants hidden"></div>
-      <div id="warn-left" class="warn-strip"></div>
-    </section>
-
-    <section class="pane" data-side="right">
-      <div class="pane-head">
-        <span class="pane-label" id="label-right">Translation <span class="dim">(or type here to reverse)</span></span>
-        <span class="dim pane-status" id="status-right"></span>
+    </div>
+    <div class="menu" data-menu="options">
+      <span class="menu-title"><u>O</u>ptions</span>
+      <div class="menu-drop">
+        <button class="mi mi-check" data-cmd="toggle-blur"><span class="check"></span>Blur reveal (pt→en)</button>
+        <button class="mi mi-check" data-cmd="toggle-progressive"><span class="check"></span>Progressive mode</button>
+        <button class="mi mi-check" data-cmd="toggle-critique"><span class="check"></span>Critique mode</button>
+        <div class="msep"></div>
+        <button class="mi" data-cmd="settings">Settings…</button>
       </div>
-      <div class="pane-body">
-        <textarea id="text-right" class="pane-text" spellcheck="false"
-          placeholder="…or type English here — the Portuguese appears on the left"></textarea>
-        <div id="render-right" class="pane-render hidden"></div>
-        <button id="reveal-right" class="reveal-overlay hidden">
-          <span>tap to reveal</span>
-          <small>try to understand the Portuguese first</small>
-        </button>
+    </div>
+    <div class="menu" data-menu="help">
+      <span class="menu-title"><u>H</u>elp</span>
+      <div class="menu-drop">
+        <button class="mi" data-cmd="about">About Tradutor…</button>
       </div>
-      <div id="chips-right" class="chip-strip"></div>
-      <div id="variants-right" class="variants hidden"></div>
-      <div id="warn-right" class="warn-strip"></div>
-    </section>
+    </div>
   </div>
 
-  <div class="askbar">
-    <input id="ask-input" type="text" autocomplete="off"
-      placeholder="Ask about this translation — e.g. why is this word used here? (Enter to send)">
-    <button id="ask-btn" class="btn">Ask</button>
+  <!-- toolbar -->
+  <div class="toolbar">
+    <button class="tbtn" id="tb-translate" title="Translate the input text (Ctrl+Enter)"><span class="ticon">🔁</span><span class="tlabel">Translate</span></button>
+    <button class="tbtn" id="tb-speak" title="Speak the Portuguese out loud (needs an OpenAI key)"><span class="ticon">🔊</span><span class="tlabel">Speak</span></button>
+    <button class="tbtn" id="tb-clear" title="Clear the input and output boxes"><span class="ticon">🧹</span><span class="tlabel">Clear</span></button>
+    <div class="tsep"></div>
+    <button class="tbtn" id="tb-open" title="Open an ebook (epub, mobi, fb2, html, txt)"><span class="ticon">📖</span><span class="tlabel">Open Book</span></button>
+    <div class="tsep"></div>
+    <button class="tbtn" id="tb-anki" title="Create/update the Anki deck via AnkiConnect"><span class="ticon">🗃️</span><span class="tlabel">Anki Sync</span></button>
+    <button class="tbtn" id="tb-settings" title="API keys, model, voice, deck name"><span class="ticon">⚙️</span><span class="tlabel">Settings</span></button>
   </div>
-  <div id="ask-answer" class="ask-answer hidden"></div>
-</main>
 
-<!-- word detail side panel -->
-<aside id="word-panel" class="side-panel hidden">
-  <div class="side-head">
-    <h2 id="wp-surface"></h2>
-    <button id="wp-close" class="btn btn-small">✕</button>
+  <!-- error strip -->
+  <div id="error-bar" class="error-bar hidden">
+    <span class="err-icon">⚠️</span>
+    <span id="error-text"></span>
+    <button id="btn-retry" class="btn btn-small">Retry</button>
+    <button id="btn-error-close" class="btn btn-small">✕</button>
   </div>
-  <div class="side-body">
+
+  <!-- notebook tabs -->
+  <div class="tabstrip">
+    <button class="tab active" data-page="translator">Translator</button>
+    <button class="tab" data-page="reader">Reader</button>
+    <button class="tab" data-page="review">Review &amp; Export</button>
+  </div>
+
+  <div class="notebook">
+
+    <!-- ============ TRANSLATOR ============ -->
+    <div class="page" id="page-translator">
+      <div class="translator-grid">
+        <fieldset class="group">
+          <legend>Text — Português or English</legend>
+          <textarea id="input-text" class="sunken text-input" spellcheck="false" autofocus
+            placeholder="Cola aqui… Portuguese or English, chat register welcome (vc, pq, tbm, kkkk…).&#10;&#10;Press Ctrl+Enter or the Translate button."></textarea>
+          <div class="btnrow">
+            <button id="btn-translate" class="btn btn-default">Translate</button>
+            <button id="btn-clear" class="btn">Clear</button>
+            <span class="dim small">Ctrl+Enter translates · the text stays editable, only Clear empties it</span>
+          </div>
+        </fieldset>
+        <fieldset class="group">
+          <legend>Translation</legend>
+          <div class="output-wrap">
+            <div id="output" class="sunken output-render"><span class="dim">The translation appears here.</span></div>
+            <button id="reveal-overlay" class="reveal-overlay hidden">
+              <span>click to reveal</span>
+              <small>try to understand the Portuguese first</small>
+            </button>
+          </div>
+          <div class="btnrow">
+            <button id="btn-speak" class="btn">🔊 Speak pt-BR</button>
+            <button id="btn-copy" class="btn">Copy</button>
+            <span id="out-note" class="dim small"></span>
+          </div>
+        </fieldset>
+      </div>
+
+      <div id="chips" class="chip-strip"></div>
+      <div id="variants" class="variants hidden"></div>
+      <div id="warns" class="warn-strip"></div>
+
+      <fieldset class="group">
+        <legend>Ask about this translation</legend>
+        <div class="askbar">
+          <input id="ask-input" class="sunken" type="text" autocomplete="off"
+            placeholder="e.g. why is this word used here? could I say X instead? (Enter to send)">
+          <button id="ask-btn" class="btn">Ask</button>
+        </div>
+        <div id="ask-answer" class="ask-answer sunken hidden"></div>
+      </fieldset>
+    </div>
+
+    <!-- ============ READER ============ -->
+    <div class="page hidden" id="page-reader">
+      <div class="reader-grid">
+        <fieldset class="group library-group">
+          <legend>Library</legend>
+          <div id="book-list" class="sunken listbox"></div>
+          <div class="btnrow">
+            <button id="btn-open-book" class="btn">Open ebook…</button>
+            <button id="btn-delete-book" class="btn">Delete</button>
+          </div>
+          <div class="dim small">epub · mobi · fb2 · html · txt</div>
+        </fieldset>
+        <fieldset class="group reading-group">
+          <legend id="reader-legend">Reader</legend>
+          <div class="reader-controls">
+            <button id="btn-prev-ch" class="btn" title="Previous chapter">◀</button>
+            <select id="chapter-select" class="sunken"></select>
+            <button id="btn-next-ch" class="btn" title="Next chapter">▶</button>
+            <span class="dim small reader-hint">Click a word to translate &amp; save it · drag across a phrase to translate the phrase</span>
+          </div>
+          <div id="book-content" class="sunken book-content">
+            <div class="dim book-empty">No book open. Use <b>Open ebook…</b> to add one to the library, then click its title.</div>
+          </div>
+        </fieldset>
+      </div>
+    </div>
+
+    <!-- ============ REVIEW ============ -->
+    <div class="page hidden" id="page-review">
+      <fieldset class="group">
+        <legend>Saved words &amp; phrases</legend>
+        <div class="btnrow review-actions">
+          <button id="btn-anki-export" class="btn btn-default">Sync to Anki</button>
+          <label class="checkline" title="Generate pt-BR speech for cards that don't have it yet and attach it (needs an OpenAI key)">
+            <input type="checkbox" id="anki-audio" checked> attach TTS audio
+          </label>
+          <button id="btn-gen-audio" class="btn">Generate missing audio</button>
+          <a class="btn" href="/api/export/anki" download>Export TSV file…</a>
+          <span id="review-msg" class="review-msg"></span>
+        </div>
+        <div class="sunken table-wrap">
+          <table class="retro-table">
+            <thead><tr>
+              <th>pt-BR</th><th>English</th><th>Note</th><th>Context</th><th>Source</th><th>×</th><th>♪</th><th></th>
+            </tr></thead>
+            <tbody id="saved-body"></tbody>
+          </table>
+        </div>
+      </fieldset>
+      <fieldset class="group">
+        <legend>Most looked-up words (translator)</legend>
+        <div id="review-words" class="review-words"></div>
+      </fieldset>
+    </div>
+
+  </div><!-- /notebook -->
+
+  <!-- status bar -->
+  <div class="statusbar">
+    <div class="scell scell-main" id="status-main">Ready.</div>
+    <div class="scell" id="status-model"></div>
+    <div class="scell" id="status-deck"></div>
+  </div>
+
+</div><!-- /appwindow -->
+
+<!-- word detail floating window -->
+<div id="word-panel" class="miniwin word-panel hidden">
+  <div class="miniwin-title"><span id="wp-surface">word</span><button id="wp-close" class="tb-btn tb-close">✕</button></div>
+  <div class="miniwin-body">
     <div id="wp-gloss" class="wp-gloss"></div>
-    <div id="wp-meta" class="wp-meta"></div>
+    <div id="wp-meta" class="wp-meta dim"></div>
     <div id="wp-note" class="wp-note"></div>
     <div id="wp-conjugation"></div>
     <div id="wp-collocations"></div>
@@ -100,50 +212,88 @@
       <input type="checkbox" id="wp-known"> I know this word
     </label>
   </div>
-</aside>
+</div>
 
-<!-- review drawer -->
-<aside id="review-panel" class="side-panel wide hidden">
-  <div class="side-head">
-    <h2>Review</h2>
-    <div>
-      <a id="btn-anki" class="btn btn-small" href="/api/export/anki" download>Export Anki TSV</a>
-      <button id="review-close" class="btn btn-small">✕</button>
+<!-- reader lookup popup -->
+<div id="lookup-pop" class="miniwin lookup-pop hidden">
+  <div class="miniwin-title"><span>Dicionário</span><button id="lp-close" class="tb-btn tb-close">✕</button></div>
+  <div class="miniwin-body">
+    <div id="lp-pt" class="lp-pt"></div>
+    <div id="lp-en" class="lp-en"></div>
+    <div id="lp-note" class="lp-note dim"></div>
+    <div class="btnrow lp-foot">
+      <button id="lp-speak" class="btn btn-small">🔊 Speak</button>
+      <span id="lp-saved" class="lp-saved"></span>
     </div>
   </div>
-  <div class="side-body">
-    <h3>Most looked-up words</h3>
-    <div id="review-words" class="review-words"></div>
-    <h3>Sentences you needed revealed</h3>
-    <div id="review-sentences" class="review-sentences"></div>
-  </div>
-</aside>
+</div>
 
-<!-- settings modal -->
+<!-- settings dialog -->
 <div id="settings-modal" class="modal hidden">
-  <div class="modal-card">
-    <h2>Settings</h2>
-    <p class="dim">Stored locally in <code>config/settings.json</code> (gitignored). The key never leaves this machine except to call the Anthropic API.</p>
-    <label class="field">
-      <span>Anthropic API key</span>
-      <input type="password" id="set-key" placeholder="sk-ant-…" autocomplete="off">
-      <small id="set-key-hint" class="dim"></small>
-    </label>
-    <label class="field">
-      <span>Model</span>
-      <input type="text" id="set-model" placeholder="claude-opus-4-8">
-    </label>
-    <div id="set-msg" class="set-msg"></div>
-    <div class="modal-actions">
-      <button id="set-cancel" class="btn">Close</button>
-      <button id="set-save" class="btn btn-primary">Save</button>
+  <div class="miniwin dialog">
+    <div class="miniwin-title"><span>Settings — Tradutor</span><button id="set-cancel-x" class="tb-btn tb-close">✕</button></div>
+    <div class="miniwin-body">
+      <fieldset class="group">
+        <legend>Translation (Anthropic)</legend>
+        <label class="field">
+          <span>Anthropic API key</span>
+          <input type="password" id="set-key" class="sunken" placeholder="sk-ant-…" autocomplete="off">
+          <small id="set-key-hint" class="dim"></small>
+        </label>
+        <label class="field">
+          <span>Model</span>
+          <input type="text" id="set-model" class="sunken" placeholder="claude-opus-4-8">
+        </label>
+      </fieldset>
+      <fieldset class="group">
+        <legend>Speech (OpenAI TTS)</legend>
+        <label class="field">
+          <span>OpenAI API key</span>
+          <input type="password" id="set-openai" class="sunken" placeholder="sk-…" autocomplete="off">
+          <small id="set-openai-hint" class="dim"></small>
+        </label>
+        <label class="field">
+          <span>Voice</span>
+          <select id="set-voice" class="sunken"></select>
+        </label>
+      </fieldset>
+      <fieldset class="group">
+        <legend>Anki</legend>
+        <label class="field">
+          <span>Deck name (created/updated via AnkiConnect)</span>
+          <input type="text" id="set-deck" class="sunken" placeholder="Tradutor pt-BR">
+        </label>
+      </fieldset>
+      <p class="dim small">Keys are stored locally in <code>config/settings.json</code> (gitignored) and only leave this machine to call the Anthropic / OpenAI APIs.</p>
+      <div id="set-msg" class="set-msg"></div>
+      <div class="btnrow dialog-actions">
+        <button id="set-save" class="btn btn-default">OK</button>
+        <button id="set-cancel" class="btn">Cancel</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- about dialog -->
+<div id="about-modal" class="modal hidden">
+  <div class="miniwin dialog about">
+    <div class="miniwin-title"><span>About Tradutor</span><button id="about-close-x" class="tb-btn tb-close">✕</button></div>
+    <div class="miniwin-body">
+      <div class="about-head"><span class="about-icon">🇧🇷</span>
+        <div><b>Tradutor</b> 2.0<br><span class="dim">Brazilian Portuguese ↔ English learning translator</span></div>
+      </div>
+      <p class="small">Streaming translation &amp; word morphology (Anthropic API) · ebook reader with click-to-translate · Anki sync via AnkiConnect · pt-BR speech via OpenAI TTS.</p>
+      <div class="btnrow dialog-actions"><button id="about-close" class="btn btn-default">OK</button></div>
     </div>
   </div>
 </div>
 
 <div id="tooltip" class="tooltip hidden"></div>
+<input type="file" id="book-file" class="hidden" accept=".epub,.mobi,.azw,.azw3,.prc,.fb2,.txt,.html,.htm,.xhtml">
 
 <script src="abbrev.js"></script>
 <script src="app.js"></script>
+<script src="reader.js"></script>
+<script src="review.js"></script>
 </body>
 </html>
