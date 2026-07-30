@@ -1,0 +1,15 @@
+# py-cord with working DAVE E2EE *receive* — PR #3159 (voice receive rework).
+# The released 2.8.1 negotiates DAVE but double-decrypts received audio
+# (garbled); once the PR ships in a release (> 2.8.1), replace this line with:
+#   py-cord[voice]>=2.8.2
+py-cord[voice] @ git+https://github.com/Pycord-Development/pycord.git@refs/pull/3159/head
+
+# DAVE (MLS/E2EE) bindings + transport crypto — the [voice] extra pulls these,
+# but they are pinned here explicitly because they are what prevents error 4017
+davey>=0.1.4,<1
+PyNaCl>=1.6.2
+
+websockets>=13        # Deepgram live streaming
+numpy>=1.24           # stereo->mono downmix + RMS diagnostics
+PyQt6>=6.6            # overlay (not needed with --headless)
+python-dotenv>=1.0
