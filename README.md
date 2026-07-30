@@ -134,3 +134,12 @@ hash of the prompt).
 - **Port conflict** — change `port` in `config/settings.json` (or set `PORT=…`).
 - **Model errors** — the model name is editable in Settings; default is
   `claude-opus-4-8`.
+
+## Companion tools in this repo
+
+- **`legenda.py`** — live pt-BR → EN subtitle overlay that transcribes whatever is
+  playing on your desktop (local Whisper, PyQt6).
+- **[`discord-legendas/`](discord-legendas/)** — Discord bot + overlay showing live
+  per-speaker Portuguese captions from a voice channel (py-cord DAVE E2EE voice
+  receive → Deepgram streaming). See its README for setup, including the state of
+  Discord's mandatory DAVE encryption.

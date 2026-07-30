@@ -8,3 +8,8 @@ node_modules/
 npm-debug.log*
 *.log
 .DS_Store
+
+__pycache__/
+*.pyc
+.venv/
+.env
